@@ -86,6 +86,8 @@ class Compactor(Optimizer):
             raise ValueError("trigger_tokens must be positive")
         if keep_recent < 0:
             raise ValueError("keep_recent must not be negative")
+        if summary_max_tokens <= 0:
+            raise ValueError("summary_max_tokens must be positive")
         self.model = model
         self.trigger_tokens = trigger_tokens
         self.keep_recent = keep_recent
@@ -120,7 +122,7 @@ class Compactor(Optimizer):
                 VERIFY_INSTRUCTIONS,
                 f"{transcript}\n\n<summary>\n{summary}\n</summary>\n\nList the omissions now.",
             )
-            if omissions and not omissions.upper().startswith("NONE"):
+            if omissions and omissions.strip().upper() != "NONE":
                 summary = f"{summary}\n\nAdditional details:\n{omissions}"
         return summary
 
