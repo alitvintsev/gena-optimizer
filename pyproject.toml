@@ -38,10 +38,11 @@ path = "src/gena_optimizer/__init__.py"
 packages = ["src/gena_optimizer"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src", "tests", "README.md", "LICENSE", "CHANGELOG.md"]
+include = ["src", "tests", "benchmarks", "scripts", "README.md", "CONTRIBUTING.md", "LICENSE", "CHANGELOG.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 
 [tool.ruff]
 line-length = 100
