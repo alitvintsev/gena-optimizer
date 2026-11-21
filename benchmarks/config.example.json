@@ -1,0 +1,25 @@
+{
+  "token_counter": {
+    "kind": "approximate"
+  },
+  "compaction": {
+    "trigger_tokens": 200,
+    "keep_recent": 2,
+    "summary_max_tokens": 256
+  },
+  "answer_max_tokens": 512,
+  "summarizer": {
+    "provider": "openai",
+    "model": "REPLACE_WITH_MODEL_ID",
+    "api_key_env": "OPENAI_API_KEY",
+    "temperature": 0,
+    "prices": null
+  },
+  "downstream": {
+    "provider": "openai",
+    "model": "REPLACE_WITH_MODEL_ID",
+    "api_key_env": "OPENAI_API_KEY",
+    "temperature": 0,
+    "prices": null
+  }
+}
