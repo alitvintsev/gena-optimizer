@@ -10,7 +10,7 @@ import csv
 import io
 import json
 import re
-from collections.abc import Callable, Collection, Iterator, Sequence
+from collections.abc import Callable, Collection, Sequence
 from html.parser import HTMLParser
 from itertools import groupby
 from typing import Any
@@ -21,126 +21,45 @@ from gena_optimizer.types import Message
 TextTransform = Callable[[str], str]
 
 # --------------------------------------------------------------------------- #
-# Whitespace transforms (see each transform's preservation guarantees)
+# Lossless transforms
 # --------------------------------------------------------------------------- #
 
-_TRAILING_SPACE = re.compile(r"(?<=[^ \t\n])([ \t]* {2,})$|[ \t]+$", re.MULTILINE)
+_TRAILING_SPACE = re.compile(r"[ \t]+$", re.MULTILINE)
 _BLANK_RUN = re.compile(r"\n{3,}")
-_FENCE_LINE = re.compile(r"[ \t]*(`{3,}|~{3,})([^\r\n]*)")
-
-
-def _fenced_spans(text: str) -> Iterator[tuple[int, int]]:
-    """Find fences conservatively; an unclosed fence protects the rest of the text."""
-    fence = ""
-    start = offset = 0
-    for line in text.splitlines(keepends=True):
-        match = _FENCE_LINE.match(line)
-        if match:
-            marker, info = match.groups()
-            if not fence:
-                fence, start = marker, offset
-            elif marker[0] == fence[0] and len(marker) >= len(fence) and not info.strip(" \t"):
-                yield start, offset + len(line)
-                fence = ""
-        offset += len(line)
-    if fence:
-        yield start, len(text)
-
-
-def _collapse_prose(text: str, *, after_fence: bool) -> str:
-    # Count the protected closing line's newline without changing that line.
-    if after_fence:
-        text = "\n" + text
-    text = text.replace("\r\n", "\n").replace("\r", "\n")
-    text = _TRAILING_SPACE.sub(lambda match: match[1] or "", text)
-    text = _BLANK_RUN.sub("\n\n", text)
-    return text[1:] if after_fence else text
 
 
 def collapse_whitespace(text: str) -> str:
-    """Normalize prose whitespace, preserving fenced blocks and Markdown hard breaks.
+    """Normalize newlines, drop trailing spaces, and collapse runs of blank lines.
 
-    Backtick/tilde fences (at least three markers, optionally indented) are kept
-    literally, including line endings. Unclosed fences protect through EOF.
-    Outside fences, normalize newlines, trim trailing whitespace except hard
-    breaks, and collapse blank lines. Unfenced code is not guaranteed safe.
+    Indentation and spacing inside lines are kept, so code stays intact.
     """
-    parts: list[str] = []
-    end = 0
-    for start, stop in _fenced_spans(text):
-        parts.extend((_collapse_prose(text[end:start], after_fence=bool(end)), text[start:stop]))
-        end = stop
-    parts.append(_collapse_prose(text[end:], after_fence=bool(end)))
-    parts[0] = parts[0].lstrip("\n")
-    tail = parts[-1].rstrip("\n")
-    # Keep the newline that gives a final Markdown hard break its meaning.
-    parts[-1] = tail + ("\n" if tail.endswith("  ") and parts[-1].endswith("\n") else "")
-    for index in range(2, len(parts), 2):
-        # Avoid merging a protected CR and the next prose newline into CRLF.
-        if parts[index - 1].endswith("\r") and parts[index].startswith("\n"):
-            parts[index] = "\r" + parts[index][1:]
-    return "".join(parts)
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = _TRAILING_SPACE.sub("", text)
+    return _BLANK_RUN.sub("\n\n", text).strip("\n")
 
 
-_FENCED_JSON = re.compile(
-    r"(```json[ \t]*\n)(.*?)(\n[ \t]*```[ \t]*\n?)", re.DOTALL | re.IGNORECASE
-)
+_FENCED_JSON = re.compile(r"```json[ \t]*\n(.*?)\n[ \t]*```", re.DOTALL | re.IGNORECASE)
 
 
 def minify_json(text: str) -> str:
     """Remove insignificant whitespace from JSON.
 
-    Validates a whole JSON object/array or a top-level triple backtick
-    ``json`` block, then removes only whitespace outside strings. Number
-    spelling, string escapes, and duplicate keys are preserved. Other fences
-    (including nested JSON examples), unclosed fences, and invalid JSON are
-    left as is.
+    Applies when the whole text is a JSON object or array, and to fenced
+    ```` ```json ```` blocks inside larger text. Anything else is left as is.
     """
     whole = _minified(text)
     if whole is not None:
         return whole
-    parts: list[str] = []
-    end = 0
-    for start, stop in _fenced_spans(text):
-        block = text[start:stop]
-        match = _FENCED_JSON.fullmatch(block)
-        compact = _minified(match[2]) if match else None
-        if match and compact is not None:
-            block = f"{match[1]}{compact}{match[3]}"
-        parts.extend((text[end:start], block))
-        end = stop
-    return "".join((*parts, text[end:]))
+    return _FENCED_JSON.sub(
+        lambda match: f"```json\n{_minified(match.group(1)) or match.group(1)}\n```", text
+    )
 
 
 def _minified(candidate: str) -> str | None:
-    if not candidate.lstrip(" \t\r\n").startswith(("{", "[")):
+    data = _parse_json_container(candidate)
+    if data is None:
         return None
-    try:
-        json.loads(candidate, parse_int=str, parse_float=str, parse_constant=_reject_json_constant)
-    except ValueError:
-        return None
-
-    compact: list[str] = []
-    in_string = escaped = False
-    for char in candidate:
-        if in_string:
-            compact.append(char)
-            if escaped:
-                escaped = False
-            elif char == "\\":
-                escaped = True
-            elif char == '"':
-                in_string = False
-        elif char == '"':
-            in_string = True
-            compact.append(char)
-        elif char not in " \t\r\n":
-            compact.append(char)
-    return "".join(compact)
-
-
-def _reject_json_constant(value: str) -> object:
-    raise ValueError(f"invalid JSON constant: {value}")
+    return json.dumps(data, ensure_ascii=False, separators=(",", ":"))
 
 
 def _parse_json_container(candidate: str) -> dict[str, object] | list[object] | None:
@@ -271,7 +190,7 @@ def _as_table(data: object) -> list[dict[str, Any]] | None:
 # --------------------------------------------------------------------------- #
 
 DEFAULT_TRANSFORMS: tuple[TextTransform, ...] = (minify_json, collapse_whitespace)
-"""JSON minification followed by prose whitespace normalization; not universally lossless."""
+"""Meaning-preserving transforms that are safe to apply to any message."""
 
 
 class PromptHygiene(Optimizer):
@@ -279,10 +198,7 @@ class PromptHygiene(Optimizer):
 
     Args:
         transforms: Functions ``str -> str``. Defaults to :data:`DEFAULT_TRANSFORMS`,
-            which minifies JSON and normalizes prose whitespace. Fences are
-            preserved by whitespace normalization; JSON minification is separate.
-            Omit ``collapse_whitespace`` for whitespace-sensitive unfenced text,
-            or pass ``[]`` to disable all transforms.
+            which only removes insignificant whitespace.
         roles: Roles to clean. ``None`` (the default) cleans every message.
     """
 
