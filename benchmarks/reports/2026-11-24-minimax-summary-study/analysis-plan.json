@@ -1,0 +1,25 @@
+{
+  "implementation_commit": "1b7b7ba",
+  "primary_outcome": "Exact annotated JSON answer correctness, all cases including fallback and errors",
+  "selected_on_dev": "structured-256",
+  "evaluation_policy": "All six fixed treatments, no reselection, no retries or repeat-based selection",
+  "secondary_outcomes": [
+    "required facts",
+    "forbidden claims",
+    "accepted/rejected/error",
+    "local context size",
+    "full provider usage",
+    "full PAYG-equivalent cost",
+    "length stops by stage"
+  ],
+  "cost_interpretation": "Published PAYG equivalent; the actual key is subscription-based, not an invoice",
+  "limitations": [
+    "Single stochastic run per cell",
+    "4 development cases, only 4 of 7 categories",
+    "28 synthetic evaluation cases, 4 per category",
+    "Completion caps include reasoning",
+    "Local o200k_base counter is not MiniMax tokenizer",
+    "Structured adds preservation instructions as well as organization",
+    "Automatic cache and rotated execution order, not a controlled cache experiment"
+  ]
+}

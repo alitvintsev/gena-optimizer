@@ -1,0 +1,33 @@
+{
+  "token_counter": {"kind": "tiktoken", "encoding": "o200k_base"},
+  "compaction": {"trigger_tokens": 200, "keep_recent": 2, "summary_max_tokens": 256},
+  "answer_max_tokens": 512,
+  "summarizer": {
+    "provider": "openai",
+    "model": "MiniMax-M3.1-Flash",
+    "base_url": "https://api.minimax.io/v1",
+    "api_key_env": "MINIMAX_API_KEY",
+    "temperature": 1,
+    "reasoning_effort": "low",
+    "timeout": 60,
+    "prices": {
+      "input_per_million": 0.15,
+      "output_per_million": 0.60,
+      "cached_input_per_million": 0.015
+    }
+  },
+  "downstream": {
+    "provider": "openai",
+    "model": "MiniMax-M3.1-Flash",
+    "base_url": "https://api.minimax.io/v1",
+    "api_key_env": "MINIMAX_API_KEY",
+    "temperature": 1,
+    "reasoning_effort": "low",
+    "timeout": 60,
+    "prices": {
+      "input_per_million": 0.15,
+      "output_per_million": 0.60,
+      "cached_input_per_million": 0.015
+    }
+  }
+}

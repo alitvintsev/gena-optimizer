@@ -273,6 +273,11 @@ def test_metered_model_records_reply_usage_cost_and_monotonic_latency(monkeypatc
                 "cache_write_input_tokens": 0,
             },
             "cost_usd": pytest.approx(0.000296),
+            "response_metadata": {
+                "actual_model": None,
+                "finish_reason": None,
+                "reasoning_tokens": None,
+            },
             "error": None,
         }
     ]
@@ -306,6 +311,7 @@ def test_metered_model_preserves_failure_and_records_only_sanitized_metadata(mon
             "estimated_input_tokens": 15,
             "estimated_output_tokens": None,
             "usage": None,
+            "response_metadata": {},
             "cost_usd": None,
             "error": "ModelError",
         }
