@@ -1,0 +1,21 @@
+{
+  "requested_model": "MiniMax-M3.1-Flash",
+  "actual_model": "MiniMax-M3.1-Flash",
+  "completion_budget": 256,
+  "reasoning_effort": "low",
+  "finish_reason": "stop",
+  "answer": "{\"ok\":\"yes\"}",
+  "usage": {
+    "total_tokens": 223,
+    "total_characters": 0,
+    "prompt_tokens": 216,
+    "completion_tokens": 7,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "prompt_tokens_details": {
+      "cached_tokens": 197
+    }
+  },
+  "latency_seconds": 1.0415805420198012
+}

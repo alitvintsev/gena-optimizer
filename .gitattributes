@@ -1,0 +1,3 @@
+# Collapse generated evidence in PR diffs; reports and plotting code stay visible.
+benchmarks/reports/**/*.json linguist-generated=true
+benchmarks/reports/**/*.jsonl linguist-generated=true
