@@ -21,13 +21,30 @@ class UsageTransport:
         self.provider = provider
         self._transport = transport
         self.usage: dict[str, int] | None = None
+        self.response_metadata: dict[str, Any] = {}
 
     def __call__(
         self, url: str, headers: Mapping[str, str], body: Mapping[str, Any], timeout: float
     ) -> dict[str, Any]:
         self.usage = None
+        self.response_metadata = {}
         response = self._transport(url, headers, body, timeout)
         self.usage = _normalize_usage(self.provider, response)
+        # Only diagnostics, never raw responses, headers or reasoning text.
+        self.response_metadata = {"actual_model": response.get("model")}
+        if self.provider == "openai":
+            choices = response.get("choices")
+            if isinstance(choices, list) and choices and isinstance(choices[0], Mapping):
+                self.response_metadata["finish_reason"] = choices[0].get("finish_reason")
+            usage = response.get("usage", {})
+            if isinstance(usage, Mapping):
+                details = usage.get("completion_tokens_details", {})
+                if isinstance(details, Mapping):
+                    self.response_metadata["reasoning_tokens"] = _token_count(
+                        details.get("reasoning_tokens")
+                    )
+        else:
+            self.response_metadata["finish_reason"] = response.get("stop_reason")
         return response
 
 
@@ -95,6 +112,7 @@ class MeteredModel:
         estimated_input = count_message_tokens(messages, self.counter)
         if self.transport is not None:
             self.transport.usage = None
+            self.transport.response_metadata = {}
         reply = None
         error = None
         started = perf_counter()
@@ -119,6 +137,9 @@ class MeteredModel:
                     "estimated_input_tokens": estimated_input,
                     "estimated_output_tokens": self.counter(reply) if reply is not None else None,
                     "usage": usage,
+                    "response_metadata": dict(self.transport.response_metadata)
+                    if self.transport is not None
+                    else {},
                     "cost_usd": cost_for_usage(usage, self.prices),
                     "error": error,
                 }
@@ -128,6 +149,7 @@ class MeteredModel:
         self.records.clear()
         if self.transport is not None:
             self.transport.usage = None
+            self.transport.response_metadata = {}
 
 
 def _validate_prices(prices: dict[str, float] | None) -> None:

@@ -134,3 +134,56 @@ production quality. Read individual failures and compare quality, context size,
 latency, and complete call cost together. Provider behavior and outputs can vary
 between runs even with temperature zero. No paid run or model-quality result is
 included by the offline smoke.
+
+## Summary budget and instruction study
+
+`python -m benchmarks.study` runs an offline development smoke. This separate
+study compares the existing summary instructions with an explicitly structured
+record at 256, 512 and 1024 completion tokens. It uses ordinary
+`Compactor.optimize()` without verification. The structured treatment adds
+organization and explicit entity/value/source/status bindings, so this is an
+instruction-package comparison, not an isolated formatting experiment.
+
+Every case runs one original-history baseline and six fixed variants: at most
+13 model calls per case, without retries. Variants share the downstream model,
+answer settings, threshold, recent-message count and token counter. Treatment
+order rotates by case; the exact order is recorded. Fallbacks and errors stay
+in the results and their calls remain charged. Do not interpret high accuracy
+from rejected compactions as evidence of information-preserving summaries.
+
+Real requests require explicit commands and case limits:
+
+```bash
+python -m benchmarks.study dev-live --config benchmarks/config.minimax.example.json --limit 4 --output artifacts/study-dev
+python -m benchmarks.study eval-live --config benchmarks/config.minimax.example.json --calibration artifacts/study-dev/calibration.json --limit 28 --output artifacts/study-eval
+```
+
+Set `MINIMAX_API_KEY` in the process environment; never put it in a configuration
+file or command argument. The example requires the optional `tiktoken` extra.
+Its `o200k_base` counts are a consistent local size proxy, **not MiniMax's
+tokenizer or billable usage**. Summary budgets cap requested completions and
+can include thinking; they do not promise a visible summary length. Diagnostics
+record the returned model, finish reason and reasoning-token usage when present.
+`reasoning_effort` is an optional OpenAI-compatible model setting; check the
+chosen provider's supported levels before using it.
+
+The MiniMax example uses `reasoning_effort: low`. MiniMax-M3.1-Flash always
+thinks and currently ignores temperature (effective temperature 1), so repeated
+runs can differ. See the official [Chat Completions reference](https://platform.minimax.io/docs/api-reference/text-chat-openai).
+Example rates are the [published PAYG rates](https://platform.minimax.io/docs/pricing/overview)
+checked on 2026-11-24: USD 0.15 input / 0.60 output / 0.015 cached input per
+million tokens. With a subscription key, reported USD is a **PAYG-equivalent
+estimate**, not the subscription invoice or incremental cash spend. Replace
+rates for your account; absent usage/rates remain unknown.
+
+Development selects an eligible variant; evaluation requires the exact matching
+code/data/settings manifest and carries that selection unchanged. All six
+predeclared variants run on evaluation to describe the held-out curve; do not
+select a new winner from evaluation. Four development cases and 28 synthetic
+evaluation cases support descriptive results only, not statistical significance
+or production-quality guarantees.
+
+Outputs include the existing JSONL/CSV, metadata and report plus a development
+`calibration.json` or evaluation `study.json`. `checkpoint.jsonl` is flushed
+after each completed scenario. Use a new output directory for every run;
+existing study checkpoints are rejected to avoid accidental duplicate calls.

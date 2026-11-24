@@ -28,6 +28,7 @@ from gena_optimizer import (
     count_message_tokens,
     tiktoken_counter,
 )
+from gena_optimizer.compaction import DEFAULT_INSTRUCTIONS
 
 from .dataset import VERSION, evaluate, fingerprint, load, validate
 from .metering import MeteredModel, UsageTransport, aggregate_records
@@ -68,7 +69,11 @@ def run_case(case, label, mode, config, summarizer, downstream, counter):
     started = time.perf_counter()
     try:
         compactor = Compactor(
-            summarizer, verify=mode == "verified", token_counter=counter, **config["compaction"]
+            summarizer,
+            verify=mode == "verified",
+            token_counter=counter,
+            instructions=config.get("summary_instructions", DEFAULT_INSTRUCTIONS),
+            **config["compaction"],
         )
         if mode == "original":
             optimized = messages
@@ -158,6 +163,7 @@ def configuration(path=None):
             "base_url",
             "api_key_env",
             "temperature",
+            "reasoning_effort",
             "max_tokens_field",
             "timeout",
             "prices",
@@ -165,6 +171,14 @@ def configuration(path=None):
             raise ValueError(f"{role}: unknown model fields; use api_key_env for credentials")
         if model.get("provider") not in {"openai", "anthropic"} or not model.get("model"):
             raise ValueError(f"{role}: provider and model are required")
+        if "reasoning_effort" in model and (
+            model["provider"] != "openai"
+            or model["reasoning_effort"] not in ("low", "medium", "high", "xhigh", "max")
+        ):
+            raise ValueError(
+                f"{role}: reasoning_effort requires an OpenAI-compatible model "
+                "and low, medium, high, xhigh or max"
+            )
         if "base_url" in model:
             url = urlsplit(model["base_url"])
             if (
@@ -215,6 +229,8 @@ def models(config, counter, *, live=False):
             "extra_body": {"temperature": spec.get("temperature", 0)},
             "timeout": spec.get("timeout", 60),
         }
+        if "reasoning_effort" in spec:
+            options["extra_body"]["reasoning_effort"] = spec["reasoning_effort"]
         if "base_url" in spec:
             options["base_url"] = spec["base_url"]
         if spec["provider"] == "openai":
